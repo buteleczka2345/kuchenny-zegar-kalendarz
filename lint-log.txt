@@ -1,0 +1,83 @@
+﻿To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.5/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+.\gradlew.bat : Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+At line:2 char:1
++ .\gradlew.bat --no-daemon --console=plain lintDebug 2>&1 | Out-File - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Warning: SDK pr...ifferent times.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:generateDebugAndroidTestResValues UP-TO-DATE
+> Task :app:generateDebugAndroidTestLintModel UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:generateDebugLintReportModel UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:generateDebugUnitTestLintModel UP-TO-DATE
+> Task :app:lintAnalyzeDebug UP-TO-DATE
+> Task :app:lintAnalyzeDebugAndroidTest UP-TO-DATE
+> Task :app:lintAnalyzeDebugUnitTest UP-TO-DATE
+> Task :app:lintReportDebug UP-TO-DATE
+> Task :app:lintDebug
+> Task :budzik:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :budzik:preBuild UP-TO-DATE
+> Task :budzik:preDebugBuild UP-TO-DATE
+> Task :budzik:checkDebugAarMetadata UP-TO-DATE
+> Task :budzik:processDebugNavigationResources UP-TO-DATE
+> Task :budzik:compileDebugNavigationResources UP-TO-DATE
+> Task :budzik:generateDebugResValues UP-TO-DATE
+> Task :budzik:mapDebugSourceSetPaths UP-TO-DATE
+> Task :budzik:generateDebugResources UP-TO-DATE
+> Task :budzik:mergeDebugResources UP-TO-DATE
+> Task :budzik:packageDebugResources UP-TO-DATE
+> Task :budzik:parseDebugLocalResources UP-TO-DATE
+> Task :budzik:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :budzik:extractDeepLinksDebug UP-TO-DATE
+> Task :budzik:processDebugMainManifest UP-TO-DATE
+> Task :budzik:processDebugManifest UP-TO-DATE
+> Task :budzik:processDebugManifestForPackage UP-TO-DATE
+> Task :budzik:processDebugResources UP-TO-DATE
+> Task :budzik:compileDebugKotlin UP-TO-DATE
+> Task :budzik:javaPreCompileDebug UP-TO-DATE
+> Task :budzik:compileDebugJavaWithJavac NO-SOURCE
+> Task :budzik:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :budzik:preDebugAndroidTestBuild SKIPPED
+> Task :budzik:generateDebugAndroidTestResValues
+> Task :budzik:generateDebugAndroidTestLintModel
+> Task :budzik:extractProguardFiles
+> Task :budzik:generateDebugLintReportModel
+> Task :budzik:preDebugUnitTestBuild UP-TO-DATE
+> Task :budzik:generateDebugUnitTestLintModel
+> Task :budzik:lintAnalyzeDebugAndroidTest
+> Task :budzik:lintAnalyzeDebugUnitTest
+> Task :budzik:lintAnalyzeDebug
+
+> Task :budzik:lintReportDebug
+Wrote HTML report to file:///C:/Users/Admin/Downloads/cline/roboczy/kuchenny-zegar/budzik/build/reports/lint-results-debug.html
+
+> Task :budzik:lintDebug
+
+BUILD SUCCESSFUL in 28s
+56 actionable tasks: 11 executed, 45 up-to-date
