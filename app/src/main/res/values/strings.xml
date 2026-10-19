@@ -1,5 +1,3 @@
 <resources>
     <string name="app_name">Zegar i Budzik</string>
-    <string name="tab_timer">Zegar kuchenny</string>
-    <string name="tab_alarm">Budzik</string>
 </resources>
