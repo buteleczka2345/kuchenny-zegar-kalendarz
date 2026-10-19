@@ -49,6 +49,7 @@ import pl.kuchenny.budzik.ui.rounded
 import pl.kuchenny.budzik.ui.settingsButton
 import pl.kuchenny.budzik.ui.smallButton
 import pl.kuchenny.budzik.ui.styleChip
+import pl.kuchenny.timer.ui.AppTabs
 
 /**
  * Ekran budzika: lista alarmów i ustawienia dzwonka na jednej stronie.
@@ -95,7 +96,7 @@ class MainActivity : Activity() {
 
         settings = AlarmSettings(this)
         controller = BudzikGraph.controller(this)
-        setContentView(buildScreen())
+        setContentView(AppTabs.wrap(this, buildScreen(), AppTabs.Tab.ALARM))
         renderAll()
 
         if (Build.VERSION.SDK_INT >= 33 && !hasNotificationPermission()) {
@@ -115,6 +116,12 @@ class MainActivity : Activity() {
         stopPreview()
         stopShakeTest()
         super.onPause()
+    }
+
+    @Deprecated("Deprecated in Android, ale obsługa przycisku Wstecz nadal tego wymaga")
+    override fun onBackPressed() {
+        // Zakładki to osobne aktywności: Wstecz chowa całą aplikację zamiast przełączać zakładkę.
+        moveTaskToBack(true)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

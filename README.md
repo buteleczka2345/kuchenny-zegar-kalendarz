@@ -1,20 +1,21 @@
-# Kuchenny zegar i Budzik
+# Zegar i Budzik
 
-Dwie natywne aplikacje na Androida napisane w Kotlinie, w jednym projekcie Gradle:
+Jedna natywna aplikacja na Androida (Kotlin): **kuchenny zegar** i **budzik** razem, pod jedną ikoną.
+Na dole ekranu są dwie zakładki — „Zegar kuchenny” i „Budzik” — przełączane jednym dotknięciem.
+Każda zakładka zachowuje swój stan; przycisk Wstecz chowa aplikację.
 
-- **Kuchenny zegar** (moduł `app`) — kilka timerów kuchennych naraz.
-- **Budzik** (moduł `budzik`) — osobna aplikacja z wieloma alarmami.
-
-Projekt można otworzyć bezpośrednio w Android Studio. Jeden build daje dwa pliki instalacyjne:
+Powstała z dwóch osobnych aplikacji (moduły `app` i `budzik`); kod budzika jest teraz w module `app`
+(pakiet `pl.kuchenny.budzik`), a kod zegara w pakiecie `pl.kuchenny.timer`. Ustawienia, powiadomienia
+i alarmy obu części są od siebie niezależne.
 
 ```powershell
+.\gradlew.bat testDebugUnitTest
 .\gradlew.bat assembleDebug
 ```
 
-- `app\build\outputs\apk\debug\app-debug.apk` — kuchenny zegar
-- `budzik\build\outputs\apk\debug\budzik-debug.apk` — budzik
-
-Aplikacje są niezależne: osobne nazwy, ikony i pakiety, można je zainstalować razem albo tylko jedną.
+- `appuild\outputspk\debugpp-debug.apk` — gotowa aplikacja (kopia: `Zegar-i-Budzik.apk`)
+- Pakiet `pl.kuchenny.zegar`, więc instaluje się obok dwóch osobnych aplikacji.
+- `ui/AppTabs.kt` — dolny pasek zakładek wspólny dla obu ekranów.
 
 # Kuchenny zegar
 

@@ -16,4 +16,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "KuchennyZegar"
 include(":app")
-include(":budzik")

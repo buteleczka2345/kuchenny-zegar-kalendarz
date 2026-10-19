@@ -29,6 +29,7 @@ import pl.kuchenny.timer.core.TimeFormat
 import pl.kuchenny.timer.core.TimerController
 import pl.kuchenny.timer.core.TimerLimits
 import pl.kuchenny.timer.core.TimerState
+import pl.kuchenny.timer.ui.AppTabs
 import pl.kuchenny.timer.ui.Palette
 import pl.kuchenny.timer.ui.PermissionUiState
 import pl.kuchenny.timer.ui.SettingsScreen
@@ -89,7 +90,7 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
                 )
             )
         }
-        setContentView(container)
+        setContentView(AppTabs.wrap(this, container, AppTabs.Tab.TIMER))
         settingsScreen.root.visibility = View.GONE
         renderAll()
     }
@@ -132,7 +133,8 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
             showSettings(false)
             return
         }
-        super.onBackPressed()
+        // Zakładki to osobne aktywności: Wstecz chowa całą aplikację zamiast przełączać zakładkę.
+        moveTaskToBack(true)
     }
 
     override fun onRequestPermissionsResult(

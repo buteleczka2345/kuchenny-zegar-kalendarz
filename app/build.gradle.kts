@@ -8,7 +8,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "pl.kuchenny.timer"
+        applicationId = "pl.kuchenny.zegar"
         minSdk = 23
         targetSdk = 35
         versionCode = 12
