@@ -30,11 +30,15 @@ import android.widget.TextView
 import android.widget.Toast
 import pl.kuchenny.budzik.core.AlarmItem
 import pl.kuchenny.budzik.alarm.AlarmPlayer
+import pl.kuchenny.budzik.alarm.ChimePlayer
+import pl.kuchenny.budzik.alarm.ChimeReceiver
+import pl.kuchenny.budzik.alarm.HourVoicePlayer
 import pl.kuchenny.budzik.alarm.ShakeTester
 import pl.kuchenny.budzik.core.AlarmController
 import pl.kuchenny.budzik.core.AlarmsSnapshot
 import pl.kuchenny.budzik.core.CustomSound
 import pl.kuchenny.budzik.core.Days
+import pl.kuchenny.budzik.core.HourlyChime
 import pl.kuchenny.budzik.core.Ramp
 import pl.kuchenny.budzik.core.Shake
 import pl.kuchenny.budzik.core.TimeText
@@ -74,6 +78,8 @@ class MainActivity : Activity() {
     private var shakeTester: ShakeTester? = null
     private var shakeTestPeak = 0
     private lateinit var vibrationText: TextView
+    private lateinit var chimeText: TextView
+    private lateinit var chimeVolumeText: TextView
     private lateinit var permissionStatus: TextView
     private lateinit var notificationStatus: TextView
     private lateinit var exactStatus: TextView
@@ -96,6 +102,7 @@ class MainActivity : Activity() {
 
         settings = AlarmSettings(this)
         controller = BudzikGraph.controller(this)
+        ChimeReceiver.schedule(this)
         setContentView(AppTabs.wrap(this, buildScreen(), AppTabs.Tab.ALARM))
         renderAll()
 
@@ -169,6 +176,7 @@ class MainActivity : Activity() {
         )
 
         content.addView(buildSoundPanel(), matchWidth(bottom = 16))
+        content.addView(buildChimePanel(), matchWidth(bottom = 16))
         content.addView(buildReliabilityPanel(), matchWidth(bottom = 16))
         return scroll
     }
@@ -311,7 +319,135 @@ class MainActivity : Activity() {
             },
             matchWidth(top = 4)
         )
+        panel.addView(
+            checkBox("Włącz ekran, gdy budzik dzwoni", settings.screenOnEnabled) {
+                settings.screenOnEnabled = it
+            },
+            matchWidth(top = 4)
+        )
+        panel.addView(
+            checkBox("Migaj latarką, gdy budzik dzwoni", settings.flashEnabled) {
+                settings.flashEnabled = it
+            },
+            matchWidth(top = 4)
+        )
         return panel
+    }
+
+    private fun buildChimePanel(): View {
+        val panel = panel()
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(
+            label("Pykanie co godzinę", 17f, Palette.text, true),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        val toggle = Switch(this).apply {
+            isChecked = settings.chimeEnabled
+            contentDescription = "Pykanie co godzinę"
+        }
+        header.addView(toggle)
+        panel.addView(header)
+        chimeText = label("", 13f, Palette.mint, true)
+        panel.addView(chimeText, matchWidth(top = 4))
+
+        val options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        options.addView(
+            label("Od której do której godziny", 14f, Palette.text, true),
+            matchWidth(top = 12, bottom = 2)
+        )
+        val hours = (0..23).map { TimeText.clock(it, 0) }.toTypedArray()
+        val fromPicker = NumberPicker(this).apply {
+            minValue = 0
+            maxValue = 23
+            displayedValues = hours
+            wrapSelectorWheel = true
+            value = settings.chimeFrom
+            contentDescription = "Pykanie od godziny"
+            setOnValueChangedListener { _, _, newValue ->
+                settings.chimeFrom = newValue
+                onChimeChanged()
+            }
+        }
+        val toPicker = NumberPicker(this).apply {
+            minValue = 0
+            maxValue = 23
+            displayedValues = hours
+            wrapSelectorWheel = true
+            value = settings.chimeTo
+            contentDescription = "Pykanie do godziny"
+            setOnValueChangedListener { _, _, newValue ->
+                settings.chimeTo = newValue
+                onChimeChanged()
+            }
+        }
+        val range = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        range.addView(fromPicker, LinearLayout.LayoutParams(0, dp(110), 1f))
+        range.addView(label("–", 22f, Palette.text, true), LinearLayout.LayoutParams(-2, -2))
+        range.addView(toPicker, LinearLayout.LayoutParams(0, dp(110), 1f))
+        options.addView(range, matchWidth())
+        options.addView(
+            label("Poza tymi godzinami jest cisza, np. w nocy. Od 00:00 do 23:00 — cała doba.", 12f, Palette.muted),
+            matchWidth(top = 2)
+        )
+
+        options.addView(
+            label("Głośność pykania", 14f, Palette.text, true),
+            matchWidth(top = 12, bottom = 2)
+        )
+        chimeVolumeText = label("", 13f, Palette.mint, true)
+        options.addView(chimeVolumeText)
+        options.addView(
+            SeekBar(this).apply {
+                max = 100
+                progress = settings.chimeVolume
+                contentDescription = "Głośność pykania"
+                setOnSeekBarChangeListener(simpleListener { value ->
+                    settings.chimeVolume = value
+                    renderChime()
+                })
+            },
+            matchWidth()
+        )
+        options.addView(
+            checkBox("Mów, która jest godzina (zamiast pyknięcia)", settings.chimeSpeak) {
+                settings.chimeSpeak = it
+                renderChime()
+            },
+            matchWidth(top = 8)
+        )
+        options.addView(
+            smallButton("Odsłuchaj").apply {
+                setOnClickListener {
+                    val volume = settings.chimeVolume / 100f
+                    if (settings.chimeSpeak) {
+                        HourVoicePlayer.play(this@MainActivity, HourlyChime.hourOf(System.currentTimeMillis()), volume)
+                    } else {
+                        ChimePlayer.play(volume)
+                    }
+                }
+            },
+            matchWidth(top = 8)
+        )
+        options.visibility = if (settings.chimeEnabled) View.VISIBLE else View.GONE
+        panel.addView(options, matchWidth())
+
+        toggle.setOnCheckedChangeListener { _, checked ->
+            settings.chimeEnabled = checked
+            options.visibility = if (checked) View.VISIBLE else View.GONE
+            onChimeChanged()
+        }
+        return panel
+    }
+
+    private fun onChimeChanged() {
+        ChimeReceiver.schedule(this)
+        renderChime()
     }
 
     private fun buildReliabilityPanel(): View {
@@ -384,6 +520,7 @@ class MainActivity : Activity() {
         renderVolume()
         renderRamp()
         renderVibration()
+        renderChime()
         renderPermissions()
     }
 
@@ -462,6 +599,21 @@ class MainActivity : Activity() {
     private fun renderVibration() {
         val strength = settings.vibrationStrength
         setText(vibrationText, if (strength <= 0) "Wyłączona" else "$strength / 10")
+    }
+
+    private fun renderChime() {
+        setText(chimeVolumeText, "${settings.chimeVolume}%")
+        setText(
+            chimeText,
+            if (!settings.chimeEnabled) {
+                "Wyłączone"
+            } else {
+                val next = HourlyChime.next(System.currentTimeMillis(), settings.chimeFrom, settings.chimeTo)
+                (if (settings.chimeSpeak) "Mówi godzinę" else "Włączone") +
+                    " · ${TimeText.clock(settings.chimeFrom, 0)}–${TimeText.clock(settings.chimeTo, 0)}" +
+                    " · następne o ${TimeText.clock(next)}"
+            }
+        )
     }
 
     private fun renderPermissions() {

@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:allowBackup="false"
@@ -47,8 +48,21 @@
             android:name="pl.kuchenny.budzik.MainActivity"
             android:exported="false"
             android:theme="@style/BudzikTheme" />
+        <activity
+            android:name="pl.kuchenny.budzik.alarm.AlarmStopActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="pl.kuchenny.zegar.alarmstop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/BudzikTheme" />
         <receiver
             android:name="pl.kuchenny.budzik.alarm.AlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="pl.kuchenny.budzik.alarm.ChimeReceiver"
             android:exported="false" />
         <receiver
             android:name="pl.kuchenny.budzik.alarm.BootReceiver"

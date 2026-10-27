@@ -29,8 +29,10 @@ class AlarmService : Service() {
     private lateinit var player: AlarmPlayer
     private lateinit var controller: AlarmController
     private lateinit var motion: MotionDismiss
+    private lateinit var flash: FlashBlinker
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var screenLock: PowerManager.WakeLock? = null
     private var startedAt = 0L
     private var ringing = false
 
@@ -46,6 +48,7 @@ class AlarmService : Service() {
             flipEnabled = { settings.flipEnabled },
             onDismiss = { stopRinging() }
         )
+        flash = FlashBlinker(this)
         AlarmNotifications.ensureChannel(this)
     }
 
@@ -70,8 +73,10 @@ class AlarmService : Service() {
         handler.removeCallbacksAndMessages(null)
         player.stop()
         motion.stop()
+        flash.stop()
         releaseWakeLock()
         ringing = false
+        isRinging = false
         super.onDestroy()
     }
 
@@ -84,16 +89,21 @@ class AlarmService : Service() {
             return
         }
         ringing = true
+        isRinging = true
         startedAt = System.currentTimeMillis()
 
+        val title = "Budzik ${TimeText.clock(alarm.hour, alarm.minute)}"
         startForeground(
             AlarmNotifications.ID_ALARM,
             AlarmNotifications.build(
                 this,
-                title = "Budzik ${TimeText.clock(alarm.hour, alarm.minute)}",
-                text = "Dotknij powiadomienia lub potrząśnij telefonem, aby zatrzymać."
+                title = title,
+                text = "Dotknij, aby otworzyć ekran STOP, lub potrząśnij telefonem."
             )
         )
+        // Pełnoekranowe powiadomienie zwykle samo otwiera ekran STOP; to jest zapas,
+        // gdy system na to pozwala (np. telefon odblokowany).
+        runCatching { startActivity(AlarmStopActivity.intent(this, title)) }
 
         val rampMillis = settings.rampSeconds * 1_000L
         player.volume = targetVolume(0L, rampMillis)
@@ -107,6 +117,9 @@ class AlarmService : Service() {
         acquireWakeLock()
         if (settings.shakeEnabled || settings.flipEnabled) {
             motion.start()
+        }
+        if (settings.flashEnabled) {
+            flash.start()
         }
         handler.post(rampTask)
     }
@@ -132,9 +145,11 @@ class AlarmService : Service() {
             return
         }
         ringing = false
+        isRinging = false
         handler.removeCallbacks(rampTask)
         player.stop()
         motion.stop()
+        flash.stop()
         releaseWakeLock()
         stopForeground(true)
         stopSelf()
@@ -150,6 +165,17 @@ class AlarmService : Service() {
             setReferenceCounted(false)
             acquire(WAKE_LOCK_TIMEOUT_MS)
         }
+        if (settings.screenOnEnabled) {
+            // Przestarzała, ale wciąż działająca droga, by zapalić ekran z serwisu.
+            @Suppress("DEPRECATION")
+            screenLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "Budzik:Screen"
+            ).apply {
+                setReferenceCounted(false)
+                acquire(WAKE_LOCK_TIMEOUT_MS)
+            }
+        }
     }
 
     private fun releaseWakeLock() {
@@ -157,12 +183,21 @@ class AlarmService : Service() {
             if (lock.isHeld) lock.release()
         }
         wakeLock = null
+        screenLock?.let { lock ->
+            if (lock.isHeld) lock.release()
+        }
+        screenLock = null
     }
 
     companion object {
         const val ACTION_START = "pl.kuchenny.budzik.START_ALARM"
         const val ACTION_STOP = "pl.kuchenny.budzik.STOP_ALARM"
         const val EXTRA_ALARM_ID = "pl.kuchenny.budzik.extra.ALARM_ID"
+
+        /** Czy budzik właśnie dzwoni — wtedy pykanie o pełnej godzinie milknie. */
+        @Volatile
+        var isRinging = false
+            private set
 
         private const val RAMP_INTERVAL_MS = 250L
         private const val WAKE_LOCK_TIMEOUT_MS = 60 * 60 * 1_000L

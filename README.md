@@ -101,6 +101,7 @@ Druga aplikacja, niezależna od kuchennego zegara.
 - Głośność końcowa i **narastanie głośności** ustawiane suwakiem od 0 do 2 minut (co 5 s).
 - Wibracja o regulowanej sile.
 - Wyłączanie ruchem: **potrząśnięcie** i **odwrócenie telefonu ekranem do dołu** (osobne przełączniki, siła potrząśnięcia ustawiana suwakiem od 1 do 10, z przyciskiem „Sprawdź potrząśnięcie”), a także przyciskiem na powiadomieniu.
+- **Pykanie co godzinę** — przełącznik włącz/wyłącz. Jedno pyknięcie równo o pełnej godzinie (12:00, 13:00…), tylko w wybranym zakresie godzin (np. 8:00–22:00, może przechodzić przez północ), z własnym suwakiem głośności i przyciskiem „Odsłuchaj”. Pole „Mów, która jest godzina” zamienia pyknięcie na głos („Jest godzina ósma”, „Jest północ”) — nagrania `res/raw/godzina_00…23.ogg` zrobione F5-TTS (głos sklonowany z próbki) + RVC `polish_glos`. Gdy dzwoni budzik, pykanie milknie.
 - Dzwoni do zatrzymania, w pętli, także po zgaszeniu ekranu.
 - Alarmy wracają po restarcie telefonu i zmianie godziny.
 

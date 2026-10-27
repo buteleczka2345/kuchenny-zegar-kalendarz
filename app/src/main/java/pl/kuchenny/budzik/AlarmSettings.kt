@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import pl.kuchenny.budzik.core.CustomSound
 import pl.kuchenny.budzik.core.CustomSoundCodec
+import pl.kuchenny.budzik.core.HourlyChime
 import pl.kuchenny.budzik.core.Ramp
 import pl.kuchenny.budzik.core.Shake
 
@@ -83,6 +84,55 @@ class AlarmSettings(context: Context) {
             preferences.edit().putBoolean(KEY_FLIP, value).apply()
         }
 
+    /** Włączanie ekranu, gdy budzik dzwoni. */
+    var screenOnEnabled: Boolean
+        get() = preferences.getBoolean(KEY_SCREEN_ON, true)
+        set(value) {
+            preferences.edit().putBoolean(KEY_SCREEN_ON, value).apply()
+        }
+
+    /** Miganie latarką, gdy budzik dzwoni. */
+    var flashEnabled: Boolean
+        get() = preferences.getBoolean(KEY_FLASH, false)
+        set(value) {
+            preferences.edit().putBoolean(KEY_FLASH, value).apply()
+        }
+
+    /** Pykanie o pełnej godzinie. */
+    var chimeEnabled: Boolean
+        get() = preferences.getBoolean(KEY_CHIME, false)
+        set(value) {
+            preferences.edit().putBoolean(KEY_CHIME, value).apply()
+        }
+
+    /** Zamiast pyknięcia głos mówi, która jest godzina. */
+    var chimeSpeak: Boolean
+        get() = preferences.getBoolean(KEY_CHIME_SPEAK, false)
+        set(value) {
+            preferences.edit().putBoolean(KEY_CHIME_SPEAK, value).apply()
+        }
+
+    /** Pierwsza godzina, o której pyka (0–23). */
+    var chimeFrom: Int
+        get() = preferences.getInt(KEY_CHIME_FROM, HourlyChime.DEFAULT_FROM).coerceIn(0, 23)
+        set(value) {
+            preferences.edit().putInt(KEY_CHIME_FROM, value.coerceIn(0, 23)).apply()
+        }
+
+    /** Ostatnia godzina, o której pyka (0–23). */
+    var chimeTo: Int
+        get() = preferences.getInt(KEY_CHIME_TO, HourlyChime.DEFAULT_TO).coerceIn(0, 23)
+        set(value) {
+            preferences.edit().putInt(KEY_CHIME_TO, value.coerceIn(0, 23)).apply()
+        }
+
+    /** Głośność pykania w procentach. */
+    var chimeVolume: Int
+        get() = preferences.getInt(KEY_CHIME_VOLUME, 60).coerceIn(0, 100)
+        set(value) {
+            preferences.edit().putInt(KEY_CHIME_VOLUME, value.coerceIn(0, 100)).apply()
+        }
+
     companion object {
         private const val SharedPreferencesAlarmStoreName = "budzik"
 
@@ -110,5 +160,12 @@ class AlarmSettings(context: Context) {
         private const val KEY_SHAKE = "shake_dismiss"
         private const val KEY_SHAKE_LEVEL = "shake_level"
         private const val KEY_FLIP = "flip_dismiss"
+        private const val KEY_SCREEN_ON = "screen_on"
+        private const val KEY_FLASH = "flash_blink"
+        private const val KEY_CHIME = "chime_enabled"
+        private const val KEY_CHIME_SPEAK = "chime_speak"
+        private const val KEY_CHIME_FROM = "chime_from"
+        private const val KEY_CHIME_TO = "chime_to"
+        private const val KEY_CHIME_VOLUME = "chime_volume"
     }
 }

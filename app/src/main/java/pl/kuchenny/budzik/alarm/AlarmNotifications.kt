@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import pl.kuchenny.budzik.MainActivity
 
 /** Powiadomienie dzwoniącego budzika. */
 object AlarmNotifications {
@@ -17,7 +16,7 @@ object AlarmNotifications {
     const val ID_ALARM = 1
 
     private const val CHANNEL = "budzik_alarm"
-    private const val REQUEST_OPEN_APP = 10
+    private const val REQUEST_STOP_SCREEN = 10
     private const val REQUEST_STOP = 11
 
     fun ensureChannel(context: Context) {
@@ -53,22 +52,24 @@ object AlarmNotifications {
             @Suppress("DEPRECATION")
             Notification.Builder(context)
         }
+        val stopScreen = stopScreenIntent(context, title)
         return builder
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(title)
             .setContentText(text)
             .setCategory(Notification.CATEGORY_ALARM)
             .setOngoing(true)
-            .setContentIntent(openAppIntent(context))
+            .setContentIntent(stopScreen)
+            .setFullScreenIntent(stopScreen, true)
             .addAction(android.R.drawable.ic_media_pause, "Zatrzymaj budzik", stopIntent)
             .build()
     }
 
-    private fun openAppIntent(context: Context): PendingIntent = PendingIntent.getActivity(
+    /** Ekran z dużym czerwonym STOP — zapala ekran i pokazuje się nad blokadą. */
+    private fun stopScreenIntent(context: Context, title: String): PendingIntent = PendingIntent.getActivity(
         context,
-        REQUEST_OPEN_APP,
-        Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        REQUEST_STOP_SCREEN,
+        AlarmStopActivity.intent(context, title),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 }

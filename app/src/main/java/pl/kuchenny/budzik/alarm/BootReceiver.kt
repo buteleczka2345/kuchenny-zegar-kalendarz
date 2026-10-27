@@ -12,6 +12,7 @@ class BootReceiver : BroadcastReceiver() {
         val action = intent?.action ?: return
         if (action !in SUPPORTED_ACTIONS) return
         BudzikGraph.controller(context).rescheduleAll()
+        ChimeReceiver.schedule(context)
     }
 
     private companion object {

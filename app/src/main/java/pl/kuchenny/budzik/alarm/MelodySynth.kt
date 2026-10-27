@@ -195,6 +195,19 @@ object MelodySynth {
         return canvas.pcm16()
     }
 
+    // --- pykanie o pełnej godzinie ------------------------------------------
+
+    private const val CHIME_RING_SEC = 0.6
+
+    /** Pyknięcie o pełnej godzinie: jedno krótkie, dzwoneczkowe uderzenie. */
+    fun chime(sampleRate: Int = SAMPLE_RATE): ShortArray {
+        val canvas = Canvas(sampleRate, 0.02 + CHIME_RING_SEC)
+        canvas.tone(0.02, CHIME_RING_SEC, doubleArrayOf(1.0, 0.35, 0.18, 0.08),
+            pitch = { _, _ -> 1_318.51 },
+            level = { _, t -> (t / 0.004).coerceAtMost(1.0) * exp(-t * 9.0) })
+        return canvas.pcm16()
+    }
+
     /** Łagodne wejście i wyjście: [attack] i [release] to części czasu dźwięku. */
     private fun swell(progress: Double, attack: Double, release: Double): Double {
         val rise = (progress / attack).coerceAtMost(1.0)
