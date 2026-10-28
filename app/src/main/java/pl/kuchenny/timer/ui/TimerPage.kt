@@ -40,6 +40,7 @@ class TimerPage(
         fun onRenameTimer()
         fun onOpenSettings()
         fun onOpenReminders()
+        fun onRecordVoice()
     }
 
     val root: View
@@ -55,8 +56,10 @@ class TimerPage(
     private lateinit var hoursChip: Button
     private lateinit var minutesChip: Button
     private lateinit var resetChip: Button
+    private lateinit var voiceChip: Button
 
     private var stripSignature = ""
+    private var voiceShown: Boolean? = null
 
     init {
         root = buildScreen(initialPresetMillis)
@@ -193,6 +196,14 @@ class TimerPage(
             resetChip,
             LinearLayout.LayoutParams(0, activity.dp(34), 1f).apply { marginStart = activity.dp(6) }
         )
+        voiceChip = activity.choiceChip("🎤", false).apply {
+            contentDescription = "Nagraj głos dla timera"
+            setOnClickListener { listener.onRecordVoice() }
+        }
+        row.addView(
+            voiceChip,
+            LinearLayout.LayoutParams(activity.dp(52), activity.dp(34)).apply { marginStart = activity.dp(6) }
+        )
         return row
     }
 
@@ -275,6 +286,14 @@ class TimerPage(
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, activity.dp(36))
         )
         setText(timerName, snapshot.active.label)
+    }
+
+    /** Podświetlony mikrofon: aktywny timer zagra nagranym głosem. */
+    fun renderVoice(recorded: Boolean) {
+        if (voiceShown == recorded) return
+        voiceShown = recorded
+        activity.styleChip(voiceChip, recorded)
+        voiceChip.text = if (recorded) "🎤✓" else "🎤"
     }
 
     fun renderTimer(item: TimerItem, nowMillis: Long) {

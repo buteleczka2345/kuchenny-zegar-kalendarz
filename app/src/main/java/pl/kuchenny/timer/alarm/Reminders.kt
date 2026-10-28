@@ -44,6 +44,9 @@ class Reminders(context: Context) {
 
     fun note(id: Long): File = File(dir(), "$id.m4a")
 
+    /** Głos nagrany dla timera — gra zamiast dzwonka, gdy czas minie. */
+    fun timerNote(timerId: Long): File = File(dir(), "timer_$timerId.m4a")
+
     /** Nagranie w trakcie dodawania — staje się nagraniem przypomnienia po „Zapisz”. */
     fun draft(): File = File(dir(), "szkic.m4a")
 

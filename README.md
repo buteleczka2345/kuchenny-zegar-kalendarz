@@ -11,6 +11,9 @@ Kopia aplikacji „Zegar i Budzik” z **kalendarzem przypomnień w zegarze kuch
   z tą samą głośnością i wibracją, najdłużej minutę — i **sam cichnie**. Niczego nie trzeba wyłączać.
 - Po zagraniu przypomnienie i nagranie się kasują. Z listy można je wcześniej odsłuchać albo usunąć.
 - Przypomnienia wracają po restarcie telefonu; jeśli telefon był wtedy wyłączony, zagra zaraz po włączeniu.
+- **Głos dla timera**: na tarczy, obok „Zeruj”, mały przycisk 🎤. Ustawiasz czas, dotykasz 🎤, nagrywasz
+  i „Zapisz i start”. Gdy czas minie, zamiast dzwonka zagra nagranie (powtórzenia z ustawień) i się skasuje.
+  🎤✓ oznacza, że aktywny timer ma nagranie; „Usuń nagranie” wraca do zwykłego dzwonka.
 - Kod: `core/Reminder.kt` (zapis listy), `alarm/Reminders.kt` (lista, alarmy, nagrania `notatki/<id>.m4a`),
   dzwoni ten sam `alarm/AlarmService` co timery (tryb `REMINDER`).
 

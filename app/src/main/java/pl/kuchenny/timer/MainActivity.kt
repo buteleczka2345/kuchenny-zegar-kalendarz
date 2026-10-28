@@ -73,6 +73,7 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
             val snapshot = controller.snapshot()
             timerPage.renderTimers(snapshot)
             timerPage.renderTimer(snapshot.active, System.currentTimeMillis())
+            renderVoice(snapshot.active.id)
             handler.postDelayed(this, TICK_INTERVAL_MS)
         }
     }
@@ -281,6 +282,14 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
         showRemindersDialog()
     }
 
+    override fun onRecordVoice() {
+        showTimerVoiceDialog()
+    }
+
+    private fun renderVoice(timerId: Long) {
+        timerPage.renderVoice(Reminders(this).timerNote(timerId).exists())
+    }
+
     // --- kalendarz przypomnień ---------------------------------------------
 
     private fun showRemindersDialog() {
@@ -334,7 +343,6 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
     private fun showAddReminderDialog() {
         val reminders = Reminders(this)
         val draft = reminders.draft().apply { delete() }
-        var recorder: MediaRecorder? = null
 
         val datePicker = DatePicker(this).apply {
             minDate = Calendar.getInstance().apply {
@@ -364,6 +372,126 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
         timeRow.addView(label(":", 26f, Palette.text, true), LinearLayout.LayoutParams(-2, -2))
         timeRow.addView(minutePicker, LinearLayout.LayoutParams(0, dp(120), 1f))
 
+        val (recorderView, stopRecording) = voiceRecorder(draft)
+
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), dp(4))
+        }
+        form.addView(label("Dzień", 14f, Palette.text, true), matchWidth(top = 8))
+        form.addView(
+            datePicker,
+            LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        )
+        form.addView(label("Godzina", 14f, Palette.text, true), matchWidth(top = 8))
+        form.addView(timeRow, matchWidth())
+        form.addView(
+            label("Co masz zrobić — nagraj głosem", 14f, Palette.text, true),
+            matchWidth(top = 8, bottom = 6)
+        )
+        form.addView(recorderView, matchWidth())
+        form.addView(
+            label(
+                "Nagranie zagra jak dzwonek zegara (powtórzenia z ustawień), samo ucichnie i się skasuje.",
+                12f,
+                Palette.muted
+            ),
+            matchWidth(top = 2)
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Nowe przypomnienie")
+            .setView(ScrollView(this).apply { addView(form) })
+            .setPositiveButton("Zapisz") { _, _ ->
+                stopRecording()
+                val at = Calendar.getInstance().apply {
+                    clear()
+                    set(
+                        datePicker.year,
+                        datePicker.month,
+                        datePicker.dayOfMonth,
+                        hourPicker.value,
+                        minutePicker.value,
+                        0
+                    )
+                }.timeInMillis
+                when {
+                    !draft.exists() ->
+                        Toast.makeText(this, "Najpierw nagraj, co masz zrobić.", Toast.LENGTH_LONG).show()
+                    at <= System.currentTimeMillis() ->
+                        Toast.makeText(this, "Ta godzina już minęła — wybierz późniejszą.", Toast.LENGTH_LONG).show()
+                    else -> {
+                        val id = reminders.add(at)
+                        draft.renameTo(reminders.note(id))
+                        Toast.makeText(this, "Przypomnienie: ${reminderTitle(at)}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Anuluj", null)
+            .setOnDismissListener {
+                stopRecording()
+                stopReminderPlayback()
+                draft.delete()
+            }
+            .show()
+    }
+
+    /** Głos dla aktywnego timera — zagra zamiast dzwonka, gdy czas minie. */
+    private fun showTimerVoiceDialog() {
+        val reminders = Reminders(this)
+        val item = controller.active()
+        val note = reminders.timerNote(item.id)
+        val draft = reminders.draft().apply { delete() }
+        if (note.exists()) note.copyTo(draft, overwrite = true)
+        val (recorderView, stopRecording) = voiceRecorder(draft)
+
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(4))
+        }
+        form.addView(recorderView, matchWidth())
+        form.addView(
+            label(
+                "Gdy czas minie, zamiast dzwonka zagra nagranie (powtórzenia z ustawień), a potem się skasuje.",
+                12f,
+                Palette.muted
+            ),
+            matchWidth(top = 4)
+        )
+
+        val idle = item.state is TimerState.Idle
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Głos dla: ${item.label}")
+            .setView(form)
+            .setPositiveButton(if (idle) "Zapisz i start" else "Zapisz") { _, _ ->
+                stopRecording()
+                if (!draft.exists()) {
+                    Toast.makeText(this, "Najpierw nagraj, co masz zrobić.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                note.delete()
+                draft.renameTo(note)
+                if (idle) requestNotificationThenStart() else renderAll()
+            }
+            .setNegativeButton("Anuluj", null)
+            .setOnDismissListener {
+                stopRecording()
+                stopReminderPlayback()
+                draft.delete()
+                renderAll()
+            }
+        if (note.exists()) {
+            builder.setNeutralButton("Usuń nagranie") { _, _ -> note.delete() }
+        }
+        builder.show()
+    }
+
+    /**
+     * Przyciski „Nagraj głos” / „Odsłuchaj” z podpisem stanu, nagrywające do [draft].
+     * Zwraca widok i funkcję, która kończy nagrywanie.
+     */
+    private fun voiceRecorder(draft: File): Pair<View, () -> Unit> {
+        var recorder: MediaRecorder? = null
         val recordStatus = label("", 13f, Palette.mint, true)
         val recordButton = smallButton("Nagraj głos")
         val playButton = smallButton("Odsłuchaj")
@@ -438,67 +566,10 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
             LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(8) }
         )
 
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), 0, dp(16), dp(4))
-        }
-        form.addView(label("Dzień", 14f, Palette.text, true), matchWidth(top = 8))
-        form.addView(
-            datePicker,
-            LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL }
-        )
-        form.addView(label("Godzina", 14f, Palette.text, true), matchWidth(top = 8))
-        form.addView(timeRow, matchWidth())
-        form.addView(
-            label("Co masz zrobić — nagraj głosem", 14f, Palette.text, true),
-            matchWidth(top = 8, bottom = 6)
-        )
-        form.addView(recordRow, matchWidth())
-        form.addView(recordStatus, matchWidth(top = 6))
-        form.addView(
-            label(
-                "Nagranie zagra jak dzwonek zegara (powtórzenia z ustawień), samo ucichnie i się skasuje.",
-                12f,
-                Palette.muted
-            ),
-            matchWidth(top = 2)
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("Nowe przypomnienie")
-            .setView(ScrollView(this).apply { addView(form) })
-            .setPositiveButton("Zapisz") { _, _ ->
-                stopRecording()
-                val at = Calendar.getInstance().apply {
-                    clear()
-                    set(
-                        datePicker.year,
-                        datePicker.month,
-                        datePicker.dayOfMonth,
-                        hourPicker.value,
-                        minutePicker.value,
-                        0
-                    )
-                }.timeInMillis
-                when {
-                    !draft.exists() ->
-                        Toast.makeText(this, "Najpierw nagraj, co masz zrobić.", Toast.LENGTH_LONG).show()
-                    at <= System.currentTimeMillis() ->
-                        Toast.makeText(this, "Ta godzina już minęła — wybierz późniejszą.", Toast.LENGTH_LONG).show()
-                    else -> {
-                        val id = reminders.add(at)
-                        draft.renameTo(reminders.note(id))
-                        Toast.makeText(this, "Przypomnienie: ${reminderTitle(at)}", Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-            .setNegativeButton("Anuluj", null)
-            .setOnDismissListener {
-                stopRecording()
-                stopReminderPlayback()
-                draft.delete()
-            }
-            .show()
+        val view = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        view.addView(recordRow, matchWidth())
+        view.addView(recordStatus, matchWidth(top = 6))
+        return view to ::stopRecording
     }
 
     private fun playRecording(file: File) {
@@ -661,6 +732,8 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
             Toast.makeText(this, "Musi zostać co najmniej jeden timer.", Toast.LENGTH_SHORT).show()
             return
         }
+        // Nowy timer może dostać to samo id — nie może odziedziczyć cudzego nagrania.
+        Reminders(this).timerNote(id).delete()
         if (wasRinging) {
             AlarmService.stopRinging(this)
         }
@@ -714,6 +787,7 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
         timerPage.renderTimers(snapshot)
         timerPage.renderTimer(snapshot.active, System.currentTimeMillis())
         timerPage.syncDurationDial(snapshot.active.presetMillis)
+        renderVoice(snapshot.active.id)
         renderSoundLabel()
         renderPermissions()
     }

@@ -166,13 +166,14 @@ class AlarmService : Service() {
 
     private fun startRinging(mode: AlarmMode, timerId: Long) {
         val style = settings.soundStyle
-        val note = reminders.note(timerId)
-        val customUri = if (mode == AlarmMode.REMINDER) {
-            // Przypomnienie gra nagrany głos; bez nagrania — wbudowany dzwonek.
-            note.takeIf { it.exists() }?.let(Uri::fromFile)
-        } else {
-            settings.customSoundUri?.let(Uri::parse)
-        }
+        val note = when (mode) {
+            AlarmMode.REMINDER -> reminders.note(timerId)
+            AlarmMode.KITCHEN -> reminders.timerNote(timerId)
+            AlarmMode.PREVIEW -> null
+        }?.takeIf { it.exists() }
+        // Nagrany głos gra zamiast dzwonka; przypomnienie bez nagrania — wbudowany dzwonek.
+        val customUri = note?.let(Uri::fromFile)
+            ?: if (mode == AlarmMode.REMINDER) null else settings.customSoundUri?.let(Uri::parse)
         val label = when (mode) {
             AlarmMode.PREVIEW -> ""
             AlarmMode.REMINDER -> "Przypomnienie"
@@ -210,7 +211,7 @@ class AlarmService : Service() {
                 message = when (mode) {
                     AlarmMode.PREVIEW -> "Podgląd: ${soundName(style)}"
                     AlarmMode.REMINDER -> "Twoje nagranie"
-                    AlarmMode.KITCHEN -> "$label · ${soundName(style)}"
+                    AlarmMode.KITCHEN -> if (note != null) "$label · Twoje nagranie" else "$label · ${soundName(style)}"
                 }
             )
         )
@@ -288,6 +289,8 @@ class AlarmService : Service() {
         when (current.mode) {
             AlarmMode.KITCHEN -> {
                 controller.onRingFinished(current.timerId)
+                // Głos timera zagrał — kasujemy go, następne odliczanie znów gra dzwonkiem.
+                reminders.timerNote(current.timerId).delete()
                 if (notifyFinished) Notifications.showFinished(this, current.label)
             }
             // Przypomnienie zagrało: znika z listy razem z nagraniem.
