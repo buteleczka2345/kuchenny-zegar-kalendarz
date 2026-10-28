@@ -8,11 +8,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "pl.kuchenny.zegar"
+        applicationId = "pl.kuchenny.zegar.kalendarz"
         minSdk = 23
         targetSdk = 35
-        versionCode = 12
-        versionName = "2.5"
+        versionCode = 13
+        versionName = "2.6"
     }
 
     compileOptions {

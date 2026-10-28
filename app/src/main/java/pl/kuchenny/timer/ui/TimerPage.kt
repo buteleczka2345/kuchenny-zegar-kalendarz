@@ -39,6 +39,7 @@ class TimerPage(
         fun onAddTimer()
         fun onRenameTimer()
         fun onOpenSettings()
+        fun onOpenReminders()
     }
 
     val root: View
@@ -75,6 +76,13 @@ class TimerPage(
         topBar.addView(
             activity.label("Kuchenny zegar", 18f, Palette.text, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        topBar.addView(
+            activity.settingsButton("Kalendarz", listener::onOpenReminders),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                activity.dp(40)
+            ).apply { marginEnd = activity.dp(6) }
         )
         topBar.addView(
             activity.settingsButton("Ustawienia", listener::onOpenSettings),

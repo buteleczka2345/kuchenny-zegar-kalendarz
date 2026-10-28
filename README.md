@@ -1,3 +1,19 @@
+# Zegar, Budzik i Kalendarz
+
+Kopia aplikacji „Zegar i Budzik” z **kalendarzem przypomnień w zegarze kuchennym**. Ma własny pakiet
+`pl.kuchenny.zegar.kalendarz`, więc instaluje się obok starej aplikacji. Gotowy plik: `Zegar-Budzik-Kalendarz.apk`.
+
+## Kalendarz w zegarze kuchennym
+
+- Na ekranie tarczy przycisk **„Kalendarz”** → lista przypomnień i „Dodaj przypomnienie”.
+- Wybierasz **dzień** (np. za miesiąc), **godzinę i minutę**, a potem **„Nagraj głos”** — co masz zrobić.
+- O tej porze telefon odtwarza nagranie **jak dzwonek zegara**: tyle razy, ile „Powtórzenia” w ustawieniach,
+  z tą samą głośnością i wibracją, najdłużej minutę — i **sam cichnie**. Niczego nie trzeba wyłączać.
+- Po zagraniu przypomnienie i nagranie się kasują. Z listy można je wcześniej odsłuchać albo usunąć.
+- Przypomnienia wracają po restarcie telefonu; jeśli telefon był wtedy wyłączony, zagra zaraz po włączeniu.
+- Kod: `core/Reminder.kt` (zapis listy), `alarm/Reminders.kt` (lista, alarmy, nagrania `notatki/<id>.m4a`),
+  dzwoni ten sam `alarm/AlarmService` co timery (tryb `REMINDER`).
+
 # Zegar i Budzik
 
 Jedna natywna aplikacja na Androida (Kotlin): **kuchenny zegar** i **budzik** razem, pod jedną ikoną.

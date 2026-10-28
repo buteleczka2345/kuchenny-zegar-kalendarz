@@ -20,9 +20,24 @@ class PlatformAlarmScheduler(private val context: Context) : AlarmScheduler {
         get() = context.getSystemService(AlarmManager::class.java)
 
     override fun scheduleTimer(timerId: Long, endTime: Long) {
+        schedule(timerPendingIntent(timerId), endTime)
+    }
+
+    override fun cancelTimer(timerId: Long) {
+        cancel(timerPendingIntent(timerId))
+    }
+
+    fun scheduleReminder(reminderId: Long, at: Long) {
+        schedule(reminderPendingIntent(reminderId), at)
+    }
+
+    fun cancelReminder(reminderId: Long) {
+        cancel(reminderPendingIntent(reminderId))
+    }
+
+    private fun schedule(pendingIntent: PendingIntent, endTime: Long) {
         // Alarm w przeszłości ma zadziałać od razu, ale nie z datą ujemną.
         val triggerAt = maxOf(endTime, System.currentTimeMillis() + MIN_TRIGGER_DELAY_MS)
-        val pendingIntent = timerPendingIntent(timerId)
         if (canScheduleExact()) {
             try {
                 alarmManager.setExactAndAllowWhileIdle(
@@ -38,8 +53,7 @@ class PlatformAlarmScheduler(private val context: Context) : AlarmScheduler {
         alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
     }
 
-    override fun cancelTimer(timerId: Long) {
-        val pendingIntent = timerPendingIntent(timerId)
+    private fun cancel(pendingIntent: PendingIntent) {
         alarmManager.cancel(pendingIntent)
         pendingIntent.cancel()
     }
@@ -53,6 +67,15 @@ class PlatformAlarmScheduler(private val context: Context) : AlarmScheduler {
         Intent(context, AlarmReceiver::class.java)
             .setAction(AlarmReceiver.ACTION_TIMER_FINISHED)
             .setData(Uri.parse("$SCHEME://timer/$timerId")),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    private fun reminderPendingIntent(reminderId: Long): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        REQUEST_TIMER,
+        Intent(context, AlarmReceiver::class.java)
+            .setAction(AlarmReceiver.ACTION_REMINDER)
+            .setData(Uri.parse("$SCHEME://reminder/$reminderId")),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 

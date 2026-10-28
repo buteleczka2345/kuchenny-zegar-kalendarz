@@ -29,6 +29,7 @@ class AlarmService : Service() {
     private lateinit var settings: Settings
     private lateinit var audio: AlarmAudio
     private lateinit var controller: TimerController
+    private lateinit var reminders: Reminders
 
     private var session: RingSession? = null
     private var finished = false
@@ -53,6 +54,7 @@ class AlarmService : Service() {
         super.onCreate()
         settings = Settings(this)
         controller = TimerGraph.controller(this)
+        reminders = Reminders(this)
         audio = AlarmAudio(this).apply {
             onPlaybackError = {
                 // Wybrany plik jest nieczytelny — dzwonimy dzwonkiem wbudowanym.
@@ -76,6 +78,7 @@ class AlarmService : Service() {
             }
             ACTION_PREVIEW -> handlePreview()
             ACTION_START -> handleStart(command)
+            ACTION_START_REMINDER -> handleStartReminder(command)
             else -> START_NOT_STICKY
         }
     }
@@ -98,7 +101,7 @@ class AlarmService : Service() {
 
     private fun handleStart(command: Intent): Int {
         val timerId = command.getLongExtra(EXTRA_TIMER_ID, -1L)
-        if (session?.timerId == timerId) {
+        if (session?.mode == AlarmMode.KITCHEN && session?.timerId == timerId) {
             // To samo dzwonienie już trwa — nie przerywamy go.
             return START_NOT_STICKY
         }
@@ -108,12 +111,32 @@ class AlarmService : Service() {
         return START_NOT_STICKY
     }
 
+    private fun handleStartReminder(command: Intent): Int {
+        val reminderId = command.getLongExtra(EXTRA_REMINDER_ID, -1L)
+        if (reminders.find(reminderId) == null) {
+            // Przypomnienie usunięte przed czasem. Gdy nic nie gra, domykamy startForeground i kończymy.
+            if (session == null) {
+                startForeground(
+                    Notifications.ID_ALARM,
+                    Notifications.buildAlarm(this, "Przypomnienie", "Przypomnienie zostało usunięte.")
+                )
+                stopForeground(true)
+                stopSelf()
+            }
+            return START_NOT_STICKY
+        }
+        endSession(notifyFinished = false)
+        finished = false
+        startRinging(AlarmMode.REMINDER, reminderId)
+        return START_NOT_STICKY
+    }
+
     private fun handleStopTimer(command: Intent) {
         val timerId = command.getLongExtra(EXTRA_TIMER_ID, -1L)
         if (timerId > 0L) controller.stopTimer(timerId)
         when {
             session == null -> stopSelf()
-            session?.timerId == timerId -> advance(notifyFinished = false)
+            session?.mode == AlarmMode.KITCHEN && session?.timerId == timerId -> advance(notifyFinished = false)
             // Dzwoni inny timer — nie wolno go uciszać.
         }
     }
@@ -143,11 +166,17 @@ class AlarmService : Service() {
 
     private fun startRinging(mode: AlarmMode, timerId: Long) {
         val style = settings.soundStyle
-        val customUri = settings.customSoundUri?.let(Uri::parse)
-        val label = if (mode.isPreview) {
-            ""
+        val note = reminders.note(timerId)
+        val customUri = if (mode == AlarmMode.REMINDER) {
+            // Przypomnienie gra nagrany głos; bez nagrania — wbudowany dzwonek.
+            note.takeIf { it.exists() }?.let(Uri::fromFile)
         } else {
-            controller.snapshot().find(timerId)?.label ?: "Timer"
+            settings.customSoundUri?.let(Uri::parse)
+        }
+        val label = when (mode) {
+            AlarmMode.PREVIEW -> ""
+            AlarmMode.REMINDER -> "Przypomnienie"
+            AlarmMode.KITCHEN -> controller.snapshot().find(timerId)?.label ?: "Timer"
         }
         val bellCount = if (mode.isPreview) 1 else settings.bellCount
         // Dzwonek gra maksymalnie minutę; wcześniej kończy go wybrana liczba powtórzeń.
@@ -173,11 +202,15 @@ class AlarmService : Service() {
             Notifications.ID_ALARM,
             Notifications.buildAlarm(
                 this,
-                title = if (mode.isPreview) "Podgląd dzwonka" else "Czas minął!",
-                message = if (mode.isPreview) {
-                    "Podgląd: ${soundName(style)}"
-                } else {
-                    "$label · ${soundName(style)}"
+                title = when (mode) {
+                    AlarmMode.PREVIEW -> "Podgląd dzwonka"
+                    AlarmMode.REMINDER -> "Przypomnienie"
+                    AlarmMode.KITCHEN -> "Czas minął!"
+                },
+                message = when (mode) {
+                    AlarmMode.PREVIEW -> "Podgląd: ${soundName(style)}"
+                    AlarmMode.REMINDER -> "Twoje nagranie"
+                    AlarmMode.KITCHEN -> "$label · ${soundName(style)}"
                 }
             )
         )
@@ -252,9 +285,14 @@ class AlarmService : Service() {
         audio.stop()
         audio.cancelVibration()
         releaseWakeLock()
-        if (current.mode.isRealAlarm) {
-            controller.onRingFinished(current.timerId)
-            if (notifyFinished) Notifications.showFinished(this, current.label)
+        when (current.mode) {
+            AlarmMode.KITCHEN -> {
+                controller.onRingFinished(current.timerId)
+                if (notifyFinished) Notifications.showFinished(this, current.label)
+            }
+            // Przypomnienie zagrało: znika z listy razem z nagraniem.
+            AlarmMode.REMINDER -> reminders.remove(current.timerId)
+            AlarmMode.PREVIEW -> Unit
         }
     }
 
@@ -284,8 +322,10 @@ class AlarmService : Service() {
         const val ACTION_STOP = "pl.kuchenny.timer.STOP_ALARM"
         const val ACTION_STOP_TIMER = "pl.kuchenny.timer.STOP_TIMER"
         const val ACTION_PREVIEW = "pl.kuchenny.timer.PREVIEW_ALARM"
+        const val ACTION_START_REMINDER = "pl.kuchenny.timer.START_REMINDER"
 
         const val EXTRA_TIMER_ID = "pl.kuchenny.timer.extra.TIMER_ID"
+        const val EXTRA_REMINDER_ID = "pl.kuchenny.timer.extra.REMINDER_ID"
 
         private const val BELL_INTERVAL_MS = 850L
         private const val BELL_DECAY = 5.3
@@ -300,6 +340,15 @@ class AlarmService : Service() {
                 Intent(context, AlarmService::class.java)
                     .setAction(ACTION_START)
                     .putExtra(EXTRA_TIMER_ID, timerId)
+            )
+        }
+
+        fun startReminder(context: Context, reminderId: Long) {
+            deliver(
+                context,
+                Intent(context, AlarmService::class.java)
+                    .setAction(ACTION_START_REMINDER)
+                    .putExtra(EXTRA_REMINDER_ID, reminderId)
             )
         }
 

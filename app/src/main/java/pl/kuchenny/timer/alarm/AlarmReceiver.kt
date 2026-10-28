@@ -9,6 +9,11 @@ import pl.kuchenny.timer.TimerGraph
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
+        if (intent?.action == ACTION_REMINDER) {
+            val reminderId = intent.data?.lastPathSegment?.toLongOrNull() ?: return
+            AlarmService.startReminder(context, reminderId)
+            return
+        }
         if (intent?.action != ACTION_TIMER_FINISHED) return
         val timerId = intent.data?.lastPathSegment?.toLongOrNull() ?: return
         // Spóźniony albo wcześniej anulowany alarm nie może uruchomić dzwonka.
@@ -18,5 +23,6 @@ class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_TIMER_FINISHED = "pl.kuchenny.timer.TIMER_FINISHED"
+        const val ACTION_REMINDER = "pl.kuchenny.timer.REMINDER"
     }
 }

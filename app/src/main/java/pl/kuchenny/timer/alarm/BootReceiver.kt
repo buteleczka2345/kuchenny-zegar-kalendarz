@@ -16,6 +16,8 @@ class BootReceiver : BroadcastReceiver() {
 
         // Timer, który miał zadzwonić w trakcie restartu, jeszcze się odezwie.
         TimerGraph.controller(context).reconcile(missedGraceMs = BOOT_GRACE_MS)
+        // Przypomnienie, które minęło przy wyłączonym telefonie, zagra od razu.
+        Reminders(context).rescheduleAll()
     }
 
     private companion object {

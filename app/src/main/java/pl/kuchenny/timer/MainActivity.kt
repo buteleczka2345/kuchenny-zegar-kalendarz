@@ -10,6 +10,9 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,12 +21,18 @@ import android.os.Looper
 import android.os.PowerManager
 import android.provider.OpenableColumns
 import android.provider.Settings as SystemSettings
+import android.view.Gravity
 import android.view.View
+import android.widget.DatePicker
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.NumberPicker
+import android.widget.ScrollView
 import android.widget.Toast
 import pl.kuchenny.timer.alarm.AlarmService
 import pl.kuchenny.timer.alarm.Notifications
+import pl.kuchenny.timer.alarm.Reminders
 import pl.kuchenny.timer.core.ReconcileResult
 import pl.kuchenny.timer.core.TimeFormat
 import pl.kuchenny.timer.core.TimerController
@@ -34,6 +43,11 @@ import pl.kuchenny.timer.ui.Palette
 import pl.kuchenny.timer.ui.PermissionUiState
 import pl.kuchenny.timer.ui.SettingsScreen
 import pl.kuchenny.timer.ui.TimerPage
+import pl.kuchenny.timer.ui.label
+import pl.kuchenny.timer.ui.matchWidth
+import pl.kuchenny.timer.ui.smallButton
+import java.io.File
+import java.util.Calendar
 
 /**
  * Ekran aplikacji: pełnoekranowa tarcza i osobne ustawienia pod przyciskiem.
@@ -52,6 +66,7 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
     private var pendingStart = false
     private var waitingForDndSettings = false
     private var settingsVisible = false
+    private var reminderPlayer: MediaPlayer? = null
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -260,6 +275,255 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
 
     override fun onOpenSettings() {
         showSettings(true)
+    }
+
+    override fun onOpenReminders() {
+        showRemindersDialog()
+    }
+
+    // --- kalendarz przypomnień ---------------------------------------------
+
+    private fun showRemindersDialog() {
+        val reminders = Reminders(this)
+        val list = reminders.all()
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Kalendarz przypomnień")
+            .setPositiveButton("Dodaj przypomnienie") { _, _ -> showAddReminderDialog() }
+            .setNegativeButton("Zamknij", null)
+        if (list.isEmpty()) {
+            builder.setMessage(
+                "Nie masz przypomnień. Wybierz dzień i godzinę, nagraj, co masz zrobić — " +
+                    "o tej porze telefon to powie i sam ucichnie."
+            )
+        } else {
+            builder.setItems(list.map { reminderTitle(it.at) }.toTypedArray()) { _, index ->
+                showReminderActions(list[index].id, list[index].at)
+            }
+        }
+        builder.show()
+    }
+
+    private fun showReminderActions(id: Long, at: Long) {
+        val reminders = Reminders(this)
+        AlertDialog.Builder(this)
+            .setTitle(reminderTitle(at))
+            .setPositiveButton("Odsłuchaj") { _, _ ->
+                playRecording(reminders.note(id))
+                showRemindersDialog()
+            }
+            .setNeutralButton("Usuń") { _, _ ->
+                reminders.remove(id)
+                showRemindersDialog()
+            }
+            .setNegativeButton("Wstecz") { _, _ -> showRemindersDialog() }
+            .show()
+    }
+
+    private fun reminderTitle(at: Long): String {
+        val calendar = Calendar.getInstance().apply { timeInMillis = at }
+        return String.format(
+            java.util.Locale.getDefault(),
+            "%02d.%02d.%d  %s",
+            calendar.get(Calendar.DAY_OF_MONTH),
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.YEAR),
+            TimeFormat.clock(at)
+        )
+    }
+
+    private fun showAddReminderDialog() {
+        val reminders = Reminders(this)
+        val draft = reminders.draft().apply { delete() }
+        var recorder: MediaRecorder? = null
+
+        val datePicker = DatePicker(this).apply {
+            minDate = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+            }.timeInMillis
+        }
+        val hourPicker = NumberPicker(this).apply {
+            minValue = 0
+            maxValue = 23
+            wrapSelectorWheel = true
+            value = 8
+            contentDescription = "Godzina"
+        }
+        val minutePicker = NumberPicker(this).apply {
+            minValue = 0
+            maxValue = 59
+            wrapSelectorWheel = true
+            value = 0
+            contentDescription = "Minuty"
+        }
+        val timeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        timeRow.addView(hourPicker, LinearLayout.LayoutParams(0, dp(120), 1f))
+        timeRow.addView(label(":", 26f, Palette.text, true), LinearLayout.LayoutParams(-2, -2))
+        timeRow.addView(minutePicker, LinearLayout.LayoutParams(0, dp(120), 1f))
+
+        val recordStatus = label("", 13f, Palette.mint, true)
+        val recordButton = smallButton("Nagraj głos")
+        val playButton = smallButton("Odsłuchaj")
+        fun renderRecordStatus() {
+            recordStatus.text = when {
+                recorder != null -> "Nagrywanie… mów, co masz zrobić."
+                draft.exists() -> "Nagranie gotowe."
+                else -> "Brak nagrania."
+            }
+        }
+        fun stopRecording() {
+            val active = recorder ?: return
+            recorder = null
+            // Zbyt krótkie nagranie rzuca wyjątek przy stop() — wtedy go nie ma.
+            if (runCatching { active.stop() }.isFailure) draft.delete()
+            active.release()
+            recordButton.text = "Nagraj głos"
+            renderRecordStatus()
+        }
+
+        recordButton.setOnClickListener {
+            if (recorder != null) {
+                stopRecording()
+                return@setOnClickListener
+            }
+            if (Build.VERSION.SDK_INT >= 23 &&
+                checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_MIC)
+                Toast.makeText(this, "Zezwól na mikrofon i dotknij „Nagraj głos” jeszcze raz.", Toast.LENGTH_LONG)
+                    .show()
+                return@setOnClickListener
+            }
+            stopReminderPlayback()
+            draft.delete()
+            val created = if (Build.VERSION.SDK_INT >= 31) {
+                MediaRecorder(this)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            val started = runCatching {
+                created.setAudioSource(MediaRecorder.AudioSource.MIC)
+                created.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                created.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                created.setAudioSamplingRate(44_100)
+                created.setAudioEncodingBitRate(96_000)
+                created.setOutputFile(draft.absolutePath)
+                created.prepare()
+                created.start()
+            }.isSuccess
+            if (started) {
+                recorder = created
+                recordButton.text = "Zatrzymaj nagrywanie"
+            } else {
+                created.release()
+                draft.delete()
+                Toast.makeText(this, "Nie udało się włączyć mikrofonu.", Toast.LENGTH_SHORT).show()
+            }
+            renderRecordStatus()
+        }
+        playButton.setOnClickListener {
+            stopRecording()
+            playRecording(draft)
+        }
+        renderRecordStatus()
+
+        val recordRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        recordRow.addView(recordButton, LinearLayout.LayoutParams(0, dp(44), 1f))
+        recordRow.addView(
+            playButton,
+            LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(8) }
+        )
+
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), dp(4))
+        }
+        form.addView(label("Dzień", 14f, Palette.text, true), matchWidth(top = 8))
+        form.addView(
+            datePicker,
+            LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        )
+        form.addView(label("Godzina", 14f, Palette.text, true), matchWidth(top = 8))
+        form.addView(timeRow, matchWidth())
+        form.addView(
+            label("Co masz zrobić — nagraj głosem", 14f, Palette.text, true),
+            matchWidth(top = 8, bottom = 6)
+        )
+        form.addView(recordRow, matchWidth())
+        form.addView(recordStatus, matchWidth(top = 6))
+        form.addView(
+            label(
+                "Nagranie zagra jak dzwonek zegara (powtórzenia z ustawień), samo ucichnie i się skasuje.",
+                12f,
+                Palette.muted
+            ),
+            matchWidth(top = 2)
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Nowe przypomnienie")
+            .setView(ScrollView(this).apply { addView(form) })
+            .setPositiveButton("Zapisz") { _, _ ->
+                stopRecording()
+                val at = Calendar.getInstance().apply {
+                    clear()
+                    set(
+                        datePicker.year,
+                        datePicker.month,
+                        datePicker.dayOfMonth,
+                        hourPicker.value,
+                        minutePicker.value,
+                        0
+                    )
+                }.timeInMillis
+                when {
+                    !draft.exists() ->
+                        Toast.makeText(this, "Najpierw nagraj, co masz zrobić.", Toast.LENGTH_LONG).show()
+                    at <= System.currentTimeMillis() ->
+                        Toast.makeText(this, "Ta godzina już minęła — wybierz późniejszą.", Toast.LENGTH_LONG).show()
+                    else -> {
+                        val id = reminders.add(at)
+                        draft.renameTo(reminders.note(id))
+                        Toast.makeText(this, "Przypomnienie: ${reminderTitle(at)}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Anuluj", null)
+            .setOnDismissListener {
+                stopRecording()
+                stopReminderPlayback()
+                draft.delete()
+            }
+            .show()
+    }
+
+    private fun playRecording(file: File) {
+        stopReminderPlayback()
+        if (!file.exists()) return
+        reminderPlayer = runCatching {
+            MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setDataSource(file.absolutePath)
+                prepare()
+                setVolume(settings.alarmVolume / 100f, settings.alarmVolume / 100f)
+                setOnCompletionListener { stopReminderPlayback() }
+                start()
+            }
+        }.getOrNull()
+    }
+
+    private fun stopReminderPlayback() {
+        reminderPlayer?.let { runCatching { it.release() } }
+        reminderPlayer = null
     }
 
     // --- strona ustawień ----------------------------------------------------
@@ -579,5 +843,6 @@ class MainActivity : Activity(), TimerPage.Listener, SettingsScreen.Listener {
         const val TICK_INTERVAL_MS = 1_000L
         const val REQUEST_NOTIFICATIONS = 90
         const val REQUEST_SOUND = 91
+        const val REQUEST_MIC = 92
     }
 }
